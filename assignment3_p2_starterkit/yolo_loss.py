@@ -54,7 +54,7 @@ class YoloLoss(nn.Module):
         class_loss : scalar
         """
         
-        ##### CODE #####
+        class_loss = sum(sum((classes_pred - classes_target)**2))
         
         return class_loss
     
@@ -71,9 +71,16 @@ class YoloLoss(nn.Module):
         reg_loss : scalar
         
         """
-        
-        ##### CODE #####
-        
+        reg_loss = 0.0
+
+        for i in range(self.S):
+            for j in range(self.B):
+                x, y, w, h, _ = box_pred_response[i]
+                xhat, yhat, what, hhat, _ = box_target_response[i]
+
+                reg_loss += (x - xhat)**2 + (y - yhat)**2
+                reg_loss += (torch.sqrt(w) - torch.sqrt(what))**2 + (torch.sqrt(h) - torch.sqrt(hhat))**2
+
         return reg_loss
     
     def get_contain_conf_loss(self, box_pred_response, box_target_response_iou):
@@ -89,8 +96,15 @@ class YoloLoss(nn.Module):
         
         """
         
-        ##### CODE #####
-        
+        contain_loss = 0.0
+
+        for i in range(self.S):
+            for j in range(self.B):
+                _, _, _, _, c = box_pred_response[i]
+                _, _, _, _, chat = box_target_response_iou[i]
+
+                contain_loss += (c - chat)**2
+
         return contain_loss
     
     def get_no_object_loss(self, target_tensor, pred_tensor, no_object_mask):
@@ -112,7 +126,6 @@ class YoloLoss(nn.Module):
         the mask created above to find the loss. 
         """
         
-        ##### CODE #####
         
         return no_object_loss
         
@@ -171,6 +184,8 @@ class YoloLoss(nn.Module):
         # Create 2 tensors contains_object_mask and no_object_mask 
         # of size (Batch_size, S, S) such that each value corresponds to if the confidence of having 
         # an object > 0 in the target tensor.
+        contains_object_mask = torch.zeros((self.B, self.S, self.S))
+        no_object_mask = torch.zeros((self.B, self.S, self.S))
         
         ##### CODE #####
 
@@ -180,15 +195,19 @@ class YoloLoss(nn.Module):
         # 1) bounding_box_pred : Contains all the Bounding box predictions of all grid cells of all images
         # 2) classes_pred : Contains all the class predictions for each grid cell of each image
         # Hint : Use contains_object_mask
-        
+        bounding_box_pred, classes_pred = torch.split(contains_object_mask, 2)
+        contains_object_pred = torch.cat((bounding_box_pred, classes_pred))
         ##### CODE #####                   
         
         # Similarly as above create 2 tensors bounding_box_target and
         # classes_target.
+        bounding_box_target, classes_target = torch.split(contains_object_mask, 2)
+        contains_object_target = torch.cat((bounding_box_target, classes_target))
         
         ##### CODE #####
 
         # Compute the No object loss here
+        no_object_loss = self.get_no_object_loss(target_tensor, pred_tensor, no_object_mask)
         
         ##### CODE #####
 
