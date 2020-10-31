@@ -72,6 +72,10 @@ class YoloLoss(nn.Module):
         
         """
         reg_loss = 0.0
+        '''
+        input shape is S
+
+        '''
 
         # for i in range(self.S):
         #     for j in range(self.B):
@@ -130,8 +134,15 @@ class YoloLoss(nn.Module):
         3) Create 2 tensors which are extracted from no_object_prediction and no_object_target using
         the mask created above to find the loss. 
         """
-        
-        
+        #masking out values not containing obj
+        no_object_prediction = pred_tensor[no_object_mask]
+        no_object_target = target_tensor[no_object_mask]
+        no_object_prediction_mask = torch.zeros(no_object_prediction.shape, dtype=torch.bool)
+        no_object_prediction_mask[4::pred_tensor.shape[-1]] = True
+        no_object_prediction_mask[9::pred_tensor.shape[-1]] = True
+        no_obj_class_prediction = no_object_prediction[no_object_prediction_mask]
+        no_obj_class_target = no_object_target[no_object_prediction_mask]
+        no_object_loss = sum((no_obj_class_prediction - no_obj_class_target)**2)
         return no_object_loss
         
     
