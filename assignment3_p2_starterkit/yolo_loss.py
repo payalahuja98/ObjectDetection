@@ -73,16 +73,23 @@ class YoloLoss(nn.Module):
         """
         reg_loss = 0.0
 
-        for i in range(self.S):
-            for j in range(self.B):
-                x, y, w, h, _ = box_pred_response[i]
-                xhat, yhat, what, hhat, _ = box_target_response[i]
+        # for i in range(self.S):
+        #     for j in range(self.B):
+        #         x, y, w, h, _ = box_pred_response[i]
+        #         xhat, yhat, what, hhat, _ = box_target_response[i]
 
-                reg_loss += (x - xhat)**2 + (y - yhat)**2
-                reg_loss += (torch.sqrt(w) - torch.sqrt(what))**2 + (torch.sqrt(h) - torch.sqrt(hhat))**2
+        #         reg_loss += (x - xhat)**2 + (y - yhat)**2
+        #         reg_loss += (torch.sqrt(w) - torch.sqrt(what))**2 + (torch.sqrt(h) - torch.sqrt(hhat))**2
+        print('shape', box_pred_response.shape[0])
+        for i in range(box_pred_response.shape[0]):
+            x, y, w, h, _ = box_pred_response[i]
+            xhat, yhat, what, hhat, _ = box_target_response[i]
 
+            reg_loss += (x - xhat)**2 + (y - yhat)**2
+            reg_loss += (torch.sqrt(w) - torch.sqrt(what))**2 + (torch.sqrt(h) - torch.sqrt(hhat))**2
         return reg_loss
-    
+
+     
     def get_contain_conf_loss(self, box_pred_response, box_target_response_iou):
         """
         Parameters:
@@ -98,13 +105,11 @@ class YoloLoss(nn.Module):
         
         contain_loss = 0.0
 
-        for i in range(self.S):
-            for j in range(self.B):
-                _, _, _, _, c = box_pred_response[i]
-                _, _, _, _, chat = box_target_response_iou[i]
 
-                contain_loss += (c - chat)**2
-
+        for i in range(box_pred_response.shape[0]):
+            _, _, _, _, c = box_pred_response[i]
+            _, _, _, _, chat = box_target_response_iou[i]
+            contain_loss += (c - chat)**2
         return contain_loss
     
     def get_no_object_loss(self, target_tensor, pred_tensor, no_object_mask):
