@@ -174,7 +174,28 @@ class YoloLoss(nn.Module):
         """
         
         ##### CODE #####
+        box_target_iou = box_target.detach().clone()
+        coo_response_mask = torch.zeros(box_target.shape)
+        boxes_pred = torch.zeros(box_pred.shape[0], 4)
+        boxes_target = torch.zeros(box_target.shape[0], 4)
 
+        for i in range(box_target.shape[0]):
+            x1, y1, w1, h1, _ = box_pred[i]
+            x2, y2, w2, h2, _ = box_target[i]
+
+            box_x1, box_y1, box_w1, box_h1 = x1/self.S - 0.5*w1, y1/self.S - 0.5*h1, x1/self.S + 0.5*w1, y1/self.S + 0.5*h1
+            box_x2, box_y2, box_w2, box_h2 = x2/self.S - 0.5*w2, y2/self.S - 0.5*h2, x2/self.S + 0.5*w2, y2/self.S + 0.5*h2
+            box1 = torch.Tensor([box_x1, box_y1, box_w1, box_h1])
+            box2 = torch.Tensor([box_x2, box_y2, box_w2, box_h2])
+            boxes_pred[i] = box1
+            boxes_target[i] = box2
+
+        iou = self.compute_iou(boxes_pred, boxes_target)
+        # print(box_target_iou.shape)
+        for i in range(iou.shape[1]):#for each iou for target
+            max_idx = torch.argmax(iou[:, i])
+            box_target_iou[i][-1] = iou[max_idx, i]
+            coo_response_mask[i] = torch.ones(5)
         return box_target_iou, coo_response_mask
         
     
