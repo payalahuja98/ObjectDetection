@@ -72,25 +72,10 @@ class YoloLoss(nn.Module):
         
         """
         reg_loss = 0.0
-        '''
-        input shape is S
-
-        '''
-
-        # for i in range(self.S):
-        #     for j in range(self.B):
-        #         x, y, w, h, _ = box_pred_response[i]
-        #         xhat, yhat, what, hhat, _ = box_target_response[i]
-
-        #         reg_loss += (x - xhat)**2 + (y - yhat)**2
-        #         reg_loss += (torch.sqrt(w) - torch.sqrt(what))**2 + (torch.sqrt(h) - torch.sqrt(hhat))**2
-        print('shape', box_pred_response.shape[0])
-        for i in range(box_pred_response.shape[0]):
-            x, y, w, h, _ = box_pred_response[i]
-            xhat, yhat, what, hhat, _ = box_target_response[i]
-
-            reg_loss += (x - xhat)**2 + (y - yhat)**2
-            reg_loss += (torch.sqrt(w) - torch.sqrt(what))**2 + (torch.sqrt(h) - torch.sqrt(hhat))**2
+        x, y, w, h = box_pred_response[:, 0], box_pred_response[:, 1], box_pred_response[:, 2], box_pred_response[:, 3]
+        xhat, yhat, what, hhat = box_target_response[:, 0], box_target_response[:, 1], box_target_response[:, 2], box_target_response[:, 3]
+        reg_loss += sum((x - xhat)**2) + sum((y - yhat)**2)
+        reg_loss += sum((torch.sqrt(w) - torch.sqrt(what))**2) + sum((torch.sqrt(h) - torch.sqrt(hhat))**2)
         return reg_loss
 
      
@@ -106,14 +91,10 @@ class YoloLoss(nn.Module):
         contain_loss : scalar
         
         """
-        
         contain_loss = 0.0
-
-
-        for i in range(box_pred_response.shape[0]):
-            _, _, _, _, c = box_pred_response[i]
-            _, _, _, _, chat = box_target_response_iou[i]
-            contain_loss += (c - chat)**2
+        c = box_pred_response[:, 4]
+        chat = box_target_response_iou[:, 4]
+        contain_loss = sum((c - chat)**2)
         return contain_loss
     
     def get_no_object_loss(self, target_tensor, pred_tensor, no_object_mask):
@@ -216,6 +197,7 @@ class YoloLoss(nn.Module):
         b[~a] = 0
 
         box_target_iou[:, 4] = b
+<<<<<<< HEAD
         #take in all ones, compress to one
         coo_response_mask[a] = torch.ones(coo_response_mask.shape[1])
         #print(coo_response_mask)
@@ -223,6 +205,11 @@ class YoloLoss(nn.Module):
         
     
     
+=======
+        coo_response_mask[a] = torch.ones(coo_response_mask.shape[1])
+        return box_target_iou, coo_response_mask
+        
+>>>>>>> 75e6a09cb553bd2a8537728e48b22f08a08eaaf4
     def forward(self, pred_tensor,target_tensor):
         '''
         pred_tensor: (tensor) size(batchsize,S,S,Bx5+20=30)
@@ -252,10 +239,30 @@ class YoloLoss(nn.Module):
         '''
         # Create 2 tensors contains_object_mask and no_object_mask 
         # of size (Batch_size, S, S) such that each value corresponds to if the confidence of having 
+<<<<<<< HEAD
         # an object > 0 in the target tensor.  
         contains_object_mask = torch.max((target_tensor[:, :, :, [4, 9]])).gt(0)
         no_object_mask = not contains_object_mask
   
+=======
+        # an object > 0 in the target tensor.
+        contains_object_mask = torch.zeros((self.B, self.S, self.S))
+        no_object_mask = torch.zeros((self.B, self.S, self.S))
+
+        contains_object_mask = torch.zeros((24, 14, 14))
+
+        a = target_tensor[:,:,:,4] > 0
+        b = target_tensor[:,:,:,9] > 0
+        contains_object_mask[a] = torch.ones(1)
+        contains_object_mask[b] = torch.ones(1)
+
+        no_object_mask[~a] = torch.ones(1)
+        no_object_mask[~b] = torch.ones(1)
+
+
+        # no_object_prediction_mask = [4::target_tensor.shape[-1]] > 0
+        # no_object_prediction_mask[9::target_tensor.shape[-1]] = True
+>>>>>>> 75e6a09cb553bd2a8537728e48b22f08a08eaaf4
         ##### CODE #####
 
         # Create a tensor contains_object_pred that corresponds to 
