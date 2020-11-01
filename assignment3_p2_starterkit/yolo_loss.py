@@ -72,25 +72,10 @@ class YoloLoss(nn.Module):
         
         """
         reg_loss = 0.0
-        '''
-        input shape is S
-
-        '''
-
-        # for i in range(self.S):
-        #     for j in range(self.B):
-        #         x, y, w, h, _ = box_pred_response[i]
-        #         xhat, yhat, what, hhat, _ = box_target_response[i]
-
-        #         reg_loss += (x - xhat)**2 + (y - yhat)**2
-        #         reg_loss += (torch.sqrt(w) - torch.sqrt(what))**2 + (torch.sqrt(h) - torch.sqrt(hhat))**2
-        print('shape', box_pred_response.shape[0])
-        for i in range(box_pred_response.shape[0]):
-            x, y, w, h, _ = box_pred_response[i]
-            xhat, yhat, what, hhat, _ = box_target_response[i]
-
-            reg_loss += (x - xhat)**2 + (y - yhat)**2
-            reg_loss += (torch.sqrt(w) - torch.sqrt(what))**2 + (torch.sqrt(h) - torch.sqrt(hhat))**2
+        x, y, w, h = box_pred_response[:, 0], box_pred_response[:, 1], box_pred_response[:, 2], box_pred_response[:, 3]
+        xhat, yhat, what, hhat = box_target_response[:, 0], box_target_response[:, 1], box_target_response[:, 2], box_target_response[:, 3]
+        reg_loss += sum((x - xhat)**2) + sum((y - yhat)**2)
+        reg_loss += sum((torch.sqrt(w) - torch.sqrt(what))**2) + sum((torch.sqrt(h) - torch.sqrt(hhat))**2)
         return reg_loss
 
      
@@ -106,14 +91,10 @@ class YoloLoss(nn.Module):
         contain_loss : scalar
         
         """
-        
         contain_loss = 0.0
-
-
-        for i in range(box_pred_response.shape[0]):
-            _, _, _, _, c = box_pred_response[i]
-            _, _, _, _, chat = box_target_response_iou[i]
-            contain_loss += (c - chat)**2
+        c = box_pred_response[:, 4]
+        chat = box_target_response_iou[:, 4]
+        contain_loss = sum((c - chat)**2)
         return contain_loss
     
     def get_no_object_loss(self, target_tensor, pred_tensor, no_object_mask):
@@ -166,7 +147,8 @@ class YoloLoss(nn.Module):
         3) For finding iou's use the compute_iou function
         4) Before using compute preprocess the bounding box coordinates in such a way that 
         if for a Box b the coordinates are represented by [x, y, w, h] then 
-        x, y = x/S - 0.5*w, y/S - 0.5*h ; w, h = x/S + 0.5*w, y/S + 0.5*h
+        x, y = x/S - 0.5*w, y/S - 0.5*h ;
+        w, h = x/S + 0.5*w, y/S + 0.5*h
         Note: Over here initially x, y are the center of the box and w,h are width and height. 
         We perform this transformation to convert the correct coordinates into bounding box coordinates.
         5) Set the confidence of the box_target_iou of the bounding box to the maximum iou
@@ -174,33 +156,52 @@ class YoloLoss(nn.Module):
         """
         
         ##### CODE #####
-        box_target_iou = box_target.detach().clone()
+        box_target_iou = torch.zeros(box_target.shape)
         coo_response_mask = torch.zeros(box_target.shape)
         boxes_pred = torch.zeros(box_pred.shape[0], 4)
         boxes_target = torch.zeros(box_target.shape[0], 4)
 
+        # x1, y1, w1, h1 = box_pred[:, 0], box_pred[:, 1], box_pred[:, 2], box_pred[:, 3]
+        # x2, y2, w2, h2  = box_target[:, 0], box_target[:, 1], box_target[:, 2], box_target[:, 3]
+
+        # box_x1, box_y1 = (x1/self.S - 0.5*w1).numpy(), (y1/self.S - 0.5*h1).numpy()
+        # box_w1, box_h1 = (x1/self.S + 0.5*w1).numpy(), (y1/self.S + 0.5*h1.numpy())
+        # box_x2, box_y2 = x2/self.S - 0.5*w2, y2/self.S - 0.5*h2
+        # box_w2, box_h2 = x2/self.S + 0.5*w2, y2/self.S + 0.5*h2
+       
+        # box1_matrix = np.column_stack((box_x1, box_y1, box_w1, box_h1))
+        # print(box1_matrix)
+        # box1 = torch.Tensor([box_x1, box_y1, box_w1, box_h1])
+        # box2 = torch.Tensor([box_x2, box_y2, box_w2, box_h2])
+        # boxes_pred[i] = box1
+        # boxes_target[i] = box2
         for i in range(box_target.shape[0]):
             x1, y1, w1, h1, _ = box_pred[i]
             x2, y2, w2, h2, _ = box_target[i]
 
-            box_x1, box_y1, box_w1, box_h1 = x1/self.S - 0.5*w1, y1/self.S - 0.5*h1, x1/self.S + 0.5*w1, y1/self.S + 0.5*h1
-            box_x2, box_y2, box_w2, box_h2 = x2/self.S - 0.5*w2, y2/self.S - 0.5*h2, x2/self.S + 0.5*w2, y2/self.S + 0.5*h2
+            box_x1, box_y1 = x1/self.S - 0.5*w1, y1/self.S - 0.5*h1
+            box_w1, box_h1 = x1/self.S + 0.5*w1, y1/self.S + 0.5*h1
+            box_x2, box_y2 = x2/self.S - 0.5*w2, y2/self.S - 0.5*h2
+            box_w2, box_h2 = x2/self.S + 0.5*w2, y2/self.S + 0.5*h2
             box1 = torch.Tensor([box_x1, box_y1, box_w1, box_h1])
             box2 = torch.Tensor([box_x2, box_y2, box_w2, box_h2])
             boxes_pred[i] = box1
             boxes_target[i] = box2
 
-        iou = self.compute_iou(boxes_pred, boxes_target)
-        # print(box_target_iou.shape)
-        for i in range(iou.shape[1]):#for each iou for target
-            max_idx = torch.argmax(iou[:, i])
-            box_target_iou[i][-1] = iou[max_idx, i]
-            coo_response_mask[i] = torch.ones(5)
+        iou = self.compute_iou(boxes_target, boxes_pred)
+
+        mat = torch.diag(iou)
+        a = mat.clone().detach()
+        b = mat.clone().detach()
+        a[::2] = a[::2] > a[1::2]
+        a[1::2] = a[::2] <= a[1::2]
+        a = a.bool()
+        b[~a] = 0
+
+        box_target_iou[:, 4] = b
+        coo_response_mask[a] = torch.ones(coo_response_mask.shape[1])
         return box_target_iou, coo_response_mask
         
-    
-    
-    
     def forward(self, pred_tensor,target_tensor):
         '''
         pred_tensor: (tensor) size(batchsize,S,S,Bx5+20=30)
