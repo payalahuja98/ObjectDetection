@@ -224,7 +224,20 @@ class YoloLoss(nn.Module):
         # an object > 0 in the target tensor.
         contains_object_mask = torch.zeros((self.B, self.S, self.S))
         no_object_mask = torch.zeros((self.B, self.S, self.S))
-        
+
+        contains_object_mask = torch.zeros((24, 14, 14))
+
+        a = target_tensor[:,:,:,4] > 0
+        b = target_tensor[:,:,:,9] > 0
+        contains_object_mask[a] = torch.ones(1)
+        contains_object_mask[b] = torch.ones(1)
+
+        no_object_mask[~a] = torch.ones(1)
+        no_object_mask[~b] = torch.ones(1)
+
+
+        # no_object_prediction_mask = [4::target_tensor.shape[-1]] > 0
+        # no_object_prediction_mask[9::target_tensor.shape[-1]] = True
         ##### CODE #####
 
         # Create a tensor contains_object_pred that corresponds to 
@@ -251,6 +264,7 @@ class YoloLoss(nn.Module):
 
         # Compute the iou's of all bounding boxes and the mask for which bounding box 
         # of 2 has the maximum iou the bounding boxes for each grid cell of each image.
+        # box_target_iou, coo_response_mask = find_best_iou_boxes()
         
         ##### CODE #####
 
