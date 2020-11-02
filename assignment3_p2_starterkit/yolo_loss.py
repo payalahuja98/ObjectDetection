@@ -236,7 +236,7 @@ class YoloLoss(nn.Module):
         Returns:
         Total Loss
         '''
-        #N = pred_tensor.size()[0]
+        N = pred_tensor.size()[0]
         total_loss = 0.0
 
         '''
@@ -253,9 +253,19 @@ class YoloLoss(nn.Module):
         # Create 2 tensors contains_object_mask and no_object_mask 
         # of size (Batch_size, S, S) such that each value corresponds to if the confidence of having 
         # an object > 0 in the target tensor.  
-        contains_object_mask = torch.max((target_tensor[:, :, :, [4, 9]])).gt(0)
-        no_object_mask = not contains_object_mask
-  
+        contains_object_mask = torch.zeros(pred_tensor.shape[:3], dtype=torch.bool)
+        no_object_mask = torch.zeros(pred_tensor.shape, dtype=torch.bool)
+
+        for i in range(N):
+          for j in range(self.S):
+            for k in range(self.S):
+                temp = target_tensor[i][j][k][4] or target_tensor[i][j][k][9]
+                if temp > 0:
+                    contains_object_mask[i][j][k] = torch.ones(1)
+                else:
+                    no_object_mask[i][j][k] = torch.tensor([(temp == 0)]*30, dtype=torch.bool)
+
+        # print(contains_object_mask.shape)
         ##### CODE #####
 
         # Create a tensor contains_object_pred that corresponds to 
@@ -265,20 +275,22 @@ class YoloLoss(nn.Module):
         # 2) classes_pred : Contains all the class predictions for each grid cell of each image
         # Hint : Use contains_object_mask
         contains_object_pred = pred_tensor[contains_object_mask]
-        bounding_box_pred = contains_object_pred[:,:,:,0:10].reshape((-1,5))
-        print(bounding_box_pred.shape)
-        classes_pred = contains_object_pred[:,:,:,-20:]
+        # print(contains_object_pred.shape)
+        bounding_box_pred = contains_object_pred[:,0:10].reshape((-1,5))
+        # print(bounding_box_pred.shape)
+        classes_pred = contains_object_pred[:,-20:]
 
         ##### CODE #####                   
         
         # Similarly as above create 2 tensors bounding_box_target and
         # classes_target.
         contains_object_target = target_tensor[contains_object_mask]
-        bounding_box_target = contains_object_target[:,:,:,0:10].reshape((-1,5))
-        classes_target = contains_object_target[:,:,:,-20:]
+        # print(contains_object_target)
+        bounding_box_target = contains_object_target[:,0:10].reshape((-1,5))
+        classes_target = contains_object_target[:,-20:]
         
         ##### CODE #####
-
+        # print('no obj mask', no_object_mask.shape)
         # Compute the No object loss here
         no_object_loss = self.get_no_object_loss(target_tensor, pred_tensor, no_object_mask)
         
@@ -287,7 +299,7 @@ class YoloLoss(nn.Module):
         # Compute the iou's of all bounding boxes and the mask for which bounding box 
         # of 2 has the maximum iou the bounding boxes for each grid cell of each image.
         bounding_box_iou, max_iou_mask = self.find_best_iou_boxes(bounding_box_target, bounding_box_pred)
-        print(bounding_box_iou.shape)
+        # print(bounding_box_iou.shape)
         
         ##### CODE #####
 
@@ -297,9 +309,9 @@ class YoloLoss(nn.Module):
         # 3) box_target_response -  bounding box targets for each grid cell which has the maximum iou
         # Hint : Use contains_object_response_mask
         box_pred_response = bounding_box_pred[max_iou_mask].reshape((-1,5))
-        print(box_pred_response.shape)
+        # print(box_pred_response.shape)
         box_target_response_iou = bounding_box_iou[max_iou_mask].reshape((-1,5))
-        print(box_target_response_iou.shape)
+        # print(box_target_response_iou.shape)
         box_target_response = bounding_box_target[max_iou_mask].reshape((-1,5))
         
         ##### CODE #####
@@ -308,12 +320,11 @@ class YoloLoss(nn.Module):
         class_loss = self.get_class_prediction_loss(classes_pred, classes_target)
         contains_object_loss = self.get_contain_conf_loss(box_pred_response, box_target_response_iou)
         regression_loss = self.get_regression_loss(box_pred_response, box_target_response)
-              
+      
         ##### CODE #####
-        total_loss = contains_object_loss + no_object_loss + regression_loss + class_loss
-        
-        return total_loss
-
+   
+        total_loss = contains_object_loss +  self.l_noobj*no_object_loss + self.l_coord*regression_loss + class_loss
+        return total_loss/N
 
 
 
