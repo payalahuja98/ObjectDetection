@@ -10,6 +10,7 @@ class YoloLoss(nn.Module):
         self.B = B
         self.l_coord = l_coord
         self.l_noobj = l_noobj
+        self.eps = 1e-20
 
     def compute_iou(self, box1, box2):
         '''Compute the intersection over union of two set of boxes, each box is [x1,y1,x2,y2].
@@ -49,7 +50,6 @@ class YoloLoss(nn.Module):
         Parameters:
         classes_pred : (tensor) size (batch_size, S, S, 20)
         classes_target : (tensor) size (batch_size, S, S, 20)
-
         Returns:
         class_loss : scalar
         """
@@ -66,34 +66,17 @@ class YoloLoss(nn.Module):
         box_target_response : (tensor) size (-1, 5)
         Note : -1 corresponds to ravels the tensor into the dimension specified 
         See : https://pytorch.org/docs/stable/tensors.html#torch.Tensor.view_as
-
         Returns:
         reg_loss : scalar
         
         """
         reg_loss = 0.0
-        '''
-        input shape is S
-
-        '''
-
-        # for i in range(self.S):
-        #     for j in range(self.B):
-        #         x, y, w, h, _ = box_pred_response[i]
-        #         xhat, yhat, what, hhat, _ = box_target_response[i]
-
-        #         reg_loss += (x - xhat)**2 + (y - yhat)**2
-        #         reg_loss += (torch.sqrt(w) - torch.sqrt(what))**2 + (torch.sqrt(h) - torch.sqrt(hhat))**2
-        # print('shape', box_pred_response.shape[0])
-        for i in range(box_pred_response.shape[0]):
-            x, y, w, h, _ = box_pred_response[i]
-            xhat, yhat, what, hhat, _ = box_target_response[i]
-
-            reg_loss += (x - xhat)**2 + (y - yhat)**2
-            eps = 1e-20
-            reg_loss += (torch.sqrt(w+eps) - torch.sqrt(what+eps))**2 + (torch.sqrt(h+eps) - torch.sqrt(hhat+eps))**2
+        x, y, w, h = box_pred_response[:, 0], box_pred_response[:, 1], box_pred_response[:, 2], box_pred_response[:, 3]
+        xhat, yhat, what, hhat = box_target_response[:, 0], box_target_response[:, 1], box_target_response[:, 2], box_target_response[:, 3]
+        reg_loss += sum((x - xhat)**2) + sum((y - yhat)**2)
+        reg_loss += sum((torch.sqrt(w+self.eps) - torch.sqrt(what+self.eps))**2) + sum((torch.sqrt(h+self.eps) - torch.sqrt(hhat+self.eps))**2)
         return reg_loss
-
+    
      
     def get_contain_conf_loss(self, box_pred_response, box_target_response_iou):
         """
@@ -102,19 +85,15 @@ class YoloLoss(nn.Module):
         box_target_response_iou : (tensor) size ( -1 , 5)
         Note : -1 corresponds to ravels the tensor into the dimension specified 
         See : https://pytorch.org/docs/stable/tensors.html#torch.Tensor.view_as
-
         Returns:
         contain_loss : scalar
         
         """
-        
+        target_iou = box_target_response_iou.detach()
         contain_loss = 0.0
-
-
-        for i in range(box_pred_response.shape[0]):
-            _, _, _, _, c = box_pred_response[i]
-            _, _, _, _, chat = box_target_response_iou[i]
-            contain_loss += (c - chat)**2
+        c = box_pred_response[:, 4]
+        chat = target_iou[:, 4]
+        contain_loss = sum((c - chat)**2)
         return contain_loss
     
     def get_no_object_loss(self, target_tensor, pred_tensor, no_object_mask):
