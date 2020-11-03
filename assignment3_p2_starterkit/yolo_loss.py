@@ -84,13 +84,14 @@ class YoloLoss(nn.Module):
 
         #         reg_loss += (x - xhat)**2 + (y - yhat)**2
         #         reg_loss += (torch.sqrt(w) - torch.sqrt(what))**2 + (torch.sqrt(h) - torch.sqrt(hhat))**2
-        print('shape', box_pred_response.shape[0])
+        # print('shape', box_pred_response.shape[0])
         for i in range(box_pred_response.shape[0]):
             x, y, w, h, _ = box_pred_response[i]
             xhat, yhat, what, hhat, _ = box_target_response[i]
 
             reg_loss += (x - xhat)**2 + (y - yhat)**2
-            reg_loss += (torch.sqrt(w) - torch.sqrt(what))**2 + (torch.sqrt(h) - torch.sqrt(hhat))**2
+            eps = 1e-20
+            reg_loss += (torch.sqrt(w+eps) - torch.sqrt(what+eps))**2 + (torch.sqrt(h+eps) - torch.sqrt(hhat+eps))**2
         return reg_loss
 
      
@@ -219,7 +220,7 @@ class YoloLoss(nn.Module):
         #take in all ones, compress to one
         coo_response_mask[a] = torch.ones(coo_response_mask.shape[1])
         #print(coo_response_mask)
-        return box_target_iou, coo_response_mask.type(dtype=torch.uint8)
+        return box_target_iou, coo_response_mask.type(dtype=torch.bool)
         
     
     
@@ -255,15 +256,10 @@ class YoloLoss(nn.Module):
         # an object > 0 in the target tensor.  
         contains_object_mask = torch.zeros(pred_tensor.shape[:3], dtype=torch.bool)
         no_object_mask = torch.zeros(pred_tensor.shape, dtype=torch.bool)
+        object_exists = ((target_tensor[:, :, :, 4] + target_tensor[:, :, :, 9]) > 0)
+        contains_object_mask[object_exists] = True
+        no_object_mask[~object_exists] = True
 
-        for i in range(N):
-          for j in range(self.S):
-            for k in range(self.S):
-                temp = target_tensor[i][j][k][4] or target_tensor[i][j][k][9]
-                if temp > 0:
-                    contains_object_mask[i][j][k] = torch.ones(1)
-                else:
-                    no_object_mask[i][j][k] = torch.tensor([(temp == 0)]*30, dtype=torch.bool)
 
         # print(contains_object_mask.shape)
         ##### CODE #####
