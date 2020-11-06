@@ -89,10 +89,10 @@ class YoloLoss(nn.Module):
         contain_loss : scalar
         
         """
-        target_iou = box_target_response_iou.detach()
+        box_target_response_iou.detach()
         contain_loss = 0.0
         c = box_pred_response[:, 4]
-        chat = target_iou[:, 4]
+        chat = box_target_response_iou[:, 4]
         contain_loss = sum((c - chat)**2)
         return contain_loss
     
@@ -267,13 +267,13 @@ class YoloLoss(nn.Module):
         ##### CODE #####
         # print('no obj mask', no_object_mask.shape)
         # Compute the No object loss here
-        no_object_loss = self.get_no_object_loss(target_tensor, pred_tensor, no_object_mask)
+        no_object_loss = self.get_no_object_loss(target_tensor.cuda(), pred_tensor.cuda(), no_object_mask.cuda())
         
         ##### CODE #####
 
         # Compute the iou's of all bounding boxes and the mask for which bounding box 
         # of 2 has the maximum iou the bounding boxes for each grid cell of each image.
-        bounding_box_iou, max_iou_mask = self.find_best_iou_boxes(bounding_box_target, bounding_box_pred)
+        bounding_box_iou, max_iou_mask = self.find_best_iou_boxes(bounding_box_target.cuda(), bounding_box_pred.cuda())
         # print(bounding_box_iou.shape)
         
         ##### CODE #####
@@ -292,9 +292,9 @@ class YoloLoss(nn.Module):
         ##### CODE #####
         
         # Find the class_loss, containing object loss and regression loss
-        class_loss = self.get_class_prediction_loss(classes_pred, classes_target)
-        contains_object_loss = self.get_contain_conf_loss(box_pred_response, box_target_response_iou)
-        regression_loss = self.get_regression_loss(box_pred_response, box_target_response)
+        class_loss = self.get_class_prediction_loss(classes_pred.cuda(), classes_target.cuda())
+        contains_object_loss = self.get_contain_conf_loss(box_pred_response.cuda(), box_target_response_iou.cuda())
+        regression_loss = self.get_regression_loss(box_pred_response.cuda(), box_target_response.cuda())
       
         ##### CODE #####
    
